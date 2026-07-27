@@ -1,0 +1,21 @@
+Background:
+
+Most Bi platforms require dedicated executables: Tableau and PowerBI do. The object here is to do a BI Platform that's browser-based. 
+
+Most BI platforms require connection to a database. One design goal is to read data from Parquet files on Amazon S3. Do whatever SQL needs to be done via DuckDB, running the browser under WASM. 
+
+Ideally, this would all be done without a browser extension. 
+
+The main external server would be a web server that can serve the javascript for the visualization needed. 
+
+For larger customers, a secondary external server could deal with authentication: a connection to either Active Directory or LDAP to authenticate that this user has access to a given report or data set. 
+
+The user interface would be some javascript graphing layer, there are a number of good ones. We'll try to use open source software as much as possible, so we could use D3.js, Apache Echarts, or some similar package. Normal charts: bar, pie, line, scatter, etc would be needed as well as sankey, raincloud and 3-D plots. Animated charts would be nice. 
+
+There two parts to today's analysis: 
+First: technical viability. Is a browser-based BI platform technically feasible? 
+Second: if technically feasible, we need to produce a detailed specification so that it could be implemented either by human, AI coder, or some combination. 
+
+Please ask any clarifying questions. 
+
+
