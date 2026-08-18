@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bitcoin — Day in the Life — April 1, 2026</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  <style>
+    :root {
+      --btc: #f7931a;
+      --btc-dim: #c4720d;
+      --bg: #0d0d0d;
+      --surface: #141414;
+      --surface2: #1c1c1c;
+      --border: #252525;
+      --text: #e8e8e8;
+      --muted: #777;
+      --error: #ff6b6b;
+      --teal: #4ecdc4;
+      --blue: #5b9bd5;
+      --green: #7ec8a0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; }
+
+    /* ── Header ─────────────────────────────────── */
+    header {
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+      background: var(--surface);
+    }
+    .btc-mark { color: var(--btc); font-size: 26px; font-weight: 800; line-height: 1; }
+    .header-text h1 { font-size: 16px; font-weight: 600; letter-spacing: .01em; }
+    .header-text .sub { color: var(--muted); font-size: 12px; margin-top: 1px; }
+    .kpis { margin-left: auto; display: flex; gap: 24px; }
+    .kpi { text-align: right; }
+    .kpi-val { font-size: 18px; font-weight: 700; color: var(--btc); font-variant-numeric: tabular-nums; }
+    .kpi-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+    /* ── Controls ────────────────────────────────── */
+    #controls {
+      padding: 8px 20px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+      border-bottom: 1px solid var(--border); background: var(--surface2); flex-shrink: 0;
+    }
+    .cg { display: flex; align-items: center; gap: 8px; }
+    .cg label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    .tg { display: flex; gap: 3px; }
+    .tb {
+      padding: 4px 11px; border-radius: 3px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--muted); cursor: pointer; font-size: 11px;
+      transition: all .15s; white-space: nowrap;
+    }
+    .tb:hover { border-color: var(--btc); color: var(--text); }
+    .tb.active { background: var(--btc); border-color: var(--btc); color: #000; font-weight: 700; }
+    #version-group { flex-wrap: wrap; }
+
+    /* ── Status ──────────────────────────────────── */
+    #status-bar {
+      padding: 3px 20px; font-size: 11px; color: var(--muted);
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      min-height: 22px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+    }
+    #status-bar.err { color: var(--error); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--btc); flex-shrink: 0; }
+    .dot.spin {
+      background: transparent;
+      border: 2px solid var(--border);
+      border-top-color: var(--btc);
+      animation: rot .6s linear infinite;
+    }
+    @keyframes rot { to { transform: rotate(360deg); } }
+
+    /* ── Chart grid ──────────────────────────────── */
+    #grid {
+      flex: 1; display: grid; min-height: 0;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: repeat(3, 1fr);
+      gap: 1px; background: var(--border);
+    }
+    .cell { background: var(--surface); position: relative; min-height: 0; }
+    .cell-title {
+      position: absolute; top: 10px; left: 14px;
+      font-size: 10px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .07em;
+      pointer-events: none; z-index: 2;
+    }
+    .chart { width: 100%; height: 100%; }
+
+    /* ── Loading overlay ─────────────────────────── */
+    #overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.75);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 50;
+    }
+    .spinner {
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 3px solid var(--border); border-top-color: var(--btc);
+      animation: rot .7s linear infinite;
+    }
+    #overlay-text { margin-top: 14px; color: var(--muted); font-size: 13px; }
+
+    /* ── File fallback ───────────────────────────── */
+    #file-fallback {
+      display: none;
+      position: fixed; inset: 0; background: rgba(0,0,0,.85);
+      align-items: center; justify-content: center; z-index: 60;
+    }
+    .fallback-box {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 32px 40px; max-width: 500px; text-align: center;
+    }
+    .fallback-box h2 { font-size: 15px; margin-bottom: 8px; }
+    .fallback-box p { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+    .fallback-box code {
+      display: block; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; padding: 8px 12px; font-size: 11px; color: var(--btc);
+      word-break: break-all; margin-bottom: 16px; text-align: left;
+    }
+    .file-input-label {
+      display: inline-block; padding: 8px 20px; background: var(--btc); color: #000;
+      border-radius: 4px; font-weight: 700; font-size: 13px; cursor: pointer;
+    }
+    #file-input { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="btc-mark">₿</div>
+  <div class="header-text">
+    <h1>Bitcoin — Day in the Life</h1>
+    <div class="sub">April 1, 2026 · All transactions</div>
+  </div>
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-val" id="kpi-txns">—</div>
+      <div class="kpi-lbl">Transactions</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val" id="kpi-blocks">—</div>
+      <div class="kpi-lbl">Blocks</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val" id="kpi-btc">—</div>
+      <div class="kpi-lbl">BTC Transacted</div>
+    </div>
+  </div>
+</header>
+
+<div id="controls">
+  <div class="cg">
+    <label>Granularity</label>
+    <div class="tg" id="gran-group">
+      <button class="tb" data-val="1 minute">1 Min</button>
+      <button class="tb active" data-val="15 minutes">15 Min</button>
+      <button class="tb" data-val="1 hour">1 Hour</button>
+    </div>
+  </div>
+  <div class="cg">
+    <label>Coinbase</label>
+    <div class="tg" id="coinbase-group">
+      <button class="tb active" data-val="all">All</button>
+      <button class="tb" data-val="true">Yes</button>
+      <button class="tb" data-val="false">No</button>
+    </div>
+  </div>
+  <div class="cg">
+    <label>Version</label>
+    <div class="tg" id="version-group">
+      <button class="tb active" data-val="all">All</button>
+      <button class="tb" data-val="1">v1</button>
+      <button class="tb" data-val="2">v2</button>
+      <button class="tb" data-val="3">v3</button>
+    </div>
+  </div>
+</div>
+
+<div id="status-bar">
+  <div class="dot spin" id="status-dot"></div>
+  <span id="status-text">Initializing DuckDB-Wasm…</span>
+</div>
+
+<div id="grid">
+  <div class="cell"><div class="cell-title" id="title-fee">Avg Fee over time</div><div class="chart" id="c-fee"></div></div>
+  <div class="cell"><div class="cell-title">Total Input Value (BTC) over time</div><div class="chart" id="c-iv"></div></div>
+  <div class="cell"><div class="cell-title">Transaction count over time</div><div class="chart" id="c-txn"></div></div>
+  <div class="cell"><div class="cell-title">Avg transaction size (bytes) over time</div><div class="chart" id="c-size"></div></div>
+  <div class="cell"><div class="cell-title">Fee distribution — 100 buckets (p1–p99)</div><div class="chart" id="c-fee-dist"></div></div>
+  <div class="cell"><div class="cell-title">Input value distribution — 100 buckets (p1–p99)</div><div class="chart" id="c-iv-dist"></div></div>
+</div>
+
+<div id="overlay">
+  <div class="spinner"></div>
+  <div id="overlay-text">Loading DuckDB-Wasm…</div>
+</div>
+
+<div id="file-fallback">
+  <div class="fallback-box">
+    <h2>CORS blocked — use a local file</h2>
+    <p>The aws-public-blockchain S3 bucket doesn't allow direct browser fetch. Download the Parquet file and select it below:</p>
+    <code>aws s3 cp s3://aws-public-blockchain/v1.0/btc/transactions/date=2026-04-01/part-00000-435bf6c4-b054-4f2c-905a-671d4a9b6c0a-c000.snappy.parquet ./btc-2026-04-01.parquet</code>
+    <p>Or open this page via <code style="display:inline;background:none;border:none;padding:0;color:var(--btc)">python3 serve.py</code> (with CORS headers) and access the file directly.</p>
+    <label class="file-input-label" for="file-input">Select Parquet file…</label>
+    <input type="file" id="file-input" accept=".parquet">
+  </div>
+</div>
+
+<script type="module">
+const PARQUET_URL = 'https://aws-public-blockchain.s3.us-east-2.amazonaws.com/v1.0/btc/transactions/date=2026-04-01/part-00000-435bf6c4-b054-4f2c-905a-671d4a9b6c0a-c000.snappy.parquet';
+const BTC = '#f7931a';
+const TEAL = '#4ecdc4';
+const BLUE = '#5b9bd5';
+const GREEN = '#7ec8a0';
+
+// ── State ────────────────────────────────────────
+let state = { gran: '15 minutes', coinbase: 'all', version: 'all' };
+let db, conn, localFile = null;
+
+// ── Status helpers ───────────────────────────────
+function setStatus(msg, busy = false, error = false) {
+  document.getElementById('status-text').textContent = msg;
+  const dot = document.getElementById('status-dot');
+  dot.className = 'dot' + (busy ? ' spin' : '');
+  document.getElementById('status-bar').className = error ? 'err' : '';
+}
+function setOverlay(msg) {
+  document.getElementById('overlay-text').textContent = msg;
+  document.getElementById('overlay').style.display = 'flex';
+}
+function hideOverlay() { document.getElementById('overlay').style.display = 'none'; }
+
+// ── Chart init ───────────────────────────────────
+const charts = {};
+function initCharts() {
+  for (const id of ['c-fee','c-iv','c-txn','c-size','c-fee-dist','c-iv-dist']) {
+    charts[id] = echarts.init(document.getElementById(id), null, { renderer: 'canvas' });
+  }
+  const ro = new ResizeObserver(() => Object.values(charts).forEach(c => c.resize()));
+  document.querySelectorAll('.cell').forEach(el => ro.observe(el));
+}
+
+function fmtNum(v) {
+  if (v == null) return '—';
+  if (Math.abs(v) >= 1e9) return (v/1e9).toFixed(2)+'B';
+  if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(2)+'M';
+  if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(1)+'K';
+  if (Math.abs(v) >= 1)   return Number(v).toFixed(0);
+  if (v !== 0)             return Number(v).toPrecision(3);
+  return '0';
+}
+
+// ── ECharts option builders ──────────────────────
+function lineOpt(times, values, color, yLabel) {
+  return {
+    backgroundColor: '#141414',
+    animation: false,
+    grid: { top: 32, right: 14, bottom: 50, left: 64 },
+    tooltip: {
+      trigger: 'axis', backgroundColor: '#1c1c1c', borderColor: '#333',
+      textStyle: { color: '#ddd', fontSize: 11 },
+      formatter: p => `${p[0].axisValue}<br/>${yLabel}: <b>${fmtNum(p[0].value)}</b>`
+    },
+    xAxis: {
+      type: 'category', data: times, boundaryGap: false,
+      axisLabel: { color: '#555', fontSize: 9, rotate: 35, interval: 'auto' },
+      axisLine: { lineStyle: { color: '#252525' } },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#555', fontSize: 9, formatter: fmtNum },
+      axisLine: { show: false }, axisTick: { show: false },
+      splitLine: { lineStyle: { color: '#1e1e1e' } },
+    },
+    series: [{
+      type: 'line', data: values, smooth: 0.3, showSymbol: false,
+      lineStyle: { color, width: 1.5 },
+      areaStyle: { color: { type:'linear', x:0,y:0,x2:0,y2:1, colorStops:[{offset:0,color:color+'55'},{offset:1,color:color+'00'}] } },
+    }],
+  };
+}
+
+function histOpt(labels, values, color) {
+  return {
+    backgroundColor: '#141414',
+    animation: false,
+    grid: { top: 24, right: 14, bottom: 32, left: 64 },
+    tooltip: {
+      trigger: 'axis', backgroundColor: '#1c1c1c', borderColor: '#333',
+      textStyle: { color: '#ddd', fontSize: 11 },
+      formatter: p => `${p[0].axisValue}<br/><b>${Number(p[0].value).toLocaleString()}</b> txns`
+    },
+    xAxis: {
+      type: 'category', data: labels,
+      axisLabel: { show: false },
+      axisLine: { lineStyle: { color: '#252525' } },
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#555', fontSize: 9, formatter: fmtNum },
+      axisLine: { show: false }, axisTick: { show: false },
+      splitLine: { lineStyle: { color: '#1e1e1e' } },
+    },
+    series: [{
+      type: 'bar', data: values, barCategoryGap: '5%',
+      itemStyle: { color, borderRadius: [1,1,0,0] },
+    }],
+  };
+}
+
+// ── DuckDB helpers ───────────────────────────────
+async function query(sql) {
+  const r = await conn.query(sql);
+  return r.toArray().map(row => {
+    const obj = {};
+    for (const [k,v] of Object.entries(row.toJSON())) {
+      obj[k] = (typeof v === 'bigint') ? Number(v) : v;
+    }
+    return obj;
+  });
+}
+
+function whereClause() {
+  const conds = [];
+  if (state.coinbase !== 'all') conds.push(`is_coinbase = ${state.coinbase}`);
+  if (state.version !== 'all') conds.push(`version = ${state.version}`);
+  return conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+}
+
+// Appends an extra condition without double-WHERE.
+function andWhere(extra) {
+  const w = whereClause();
+  return w ? `${w} AND ${extra}` : `WHERE ${extra}`;
+}
+
+// ── Timestamp detection ──────────────────────────
+// block_timestamp in AWS public blockchain Parquet is stored as TIMESTAMP (microseconds).
+// Fallback: if it comes out as INT64 (unix seconds), wrap in to_timestamp().
+let tsExpr = 'block_timestamp'; // adjusted after schema check
+
+async function detectTimestampType() {
+  try {
+    const rows = await query("DESCRIBE SELECT block_timestamp FROM btc LIMIT 0");
+    const col = rows.find(r => r.column_name === 'block_timestamp');
+    if (col && (col.column_type === 'BIGINT' || col.column_type === 'INTEGER' || col.column_type === 'HUGEINT')) {
+      tsExpr = 'to_timestamp(block_timestamp)';
+    }
+  } catch (_) {}
+}
+
+// Unit detection happens inline in renderAll() from actual data — no extra query.
+
+// ── Source setup ─────────────────────────────────
+async function setupView(url) {
+  const src = url ? `read_parquet('${url}')` : `read_parquet('btc_local.parquet')`;
+  await conn.query(`CREATE OR REPLACE VIEW btc AS
+    SELECT block_timestamp, block_number, version, is_coinbase, fee, input_value, size
+    FROM ${src}`);
+}
+
+// ── Query & render ───────────────────────────────
+async function renderAll() {
+  setStatus('Querying…', true);
+
+  const where = whereClause();
+  const gran = state.gran;
+  const ts = tsExpr;
+
+  try {
+    // ── Time series ──────────────────────────────
+    setOverlay('Running time-series query…');
+    const ts_data = await query(`
+      SELECT
+        time_bucket(INTERVAL '${gran}', ${ts}::TIMESTAMPTZ) AS t,
+        COUNT(*)::DOUBLE AS tx_count,
+        AVG(fee) AS avg_fee,
+        SUM(input_value)::DOUBLE AS total_iv,
+        AVG(size) AS avg_size
+      FROM btc ${where}
+      GROUP BY t ORDER BY t
+    `);
+
+    const times = ts_data.map(r => {
+      const d = new Date(r.t instanceof Date ? r.t : Number(r.t) * 1000);
+      const hh = String(d.getUTCHours()).padStart(2,'0');
+      const mm = String(d.getUTCMinutes()).padStart(2,'0');
+      return `${hh}:${mm}`;
+    });
+
+    // Detect units from data: if max fee < 1, values are in BTC → scale to sats.
+    // Similarly if max input_value < 1, it's in BTC → display as-is.
+    const maxRawFee = Math.max(0, ...ts_data.map(r => r.avg_fee || 0));
+    const maxRawIv  = Math.max(0, ...ts_data.map(r => r.total_iv || 0));
+    const feeScale  = (maxRawFee > 0 && maxRawFee < 1) ? 1e8 : 1;
+    const ivScale   = (maxRawIv  > 0 && maxRawIv  < 1) ? 1   : 1/1e8;
+    const feeUnit   = feeScale >= 1e8 ? 'sats' : 'raw sats';
+    const ivUnit    = ivScale < 0.01  ? 'BTC'  : 'BTC';
+    console.log(`[btc-bi] maxRawFee=${maxRawFee} → scale×${feeScale} (${feeUnit}); maxRawIv=${maxRawIv} → ivScale=${ivScale}`);
+
+    const feeVals = ts_data.map(r => (r.avg_fee || 0) * feeScale);
+    const ivVals  = ts_data.map(r => (r.total_iv || 0) * ivScale);
+
+    document.getElementById('title-fee').textContent = `Avg fee (${feeUnit}) over time`;
+    charts['c-fee'].setOption(lineOpt(times, feeVals, BTC, `Avg fee (${feeUnit})`));
+    charts['c-iv'].setOption(lineOpt(times, ivVals, TEAL, `Total input (${ivUnit})`));
+    charts['c-txn'].setOption(lineOpt(times, ts_data.map(r => r.tx_count), BLUE, 'Transactions'));
+    charts['c-size'].setOption(lineOpt(times, ts_data.map(r => Math.round(r.avg_size||0)), GREEN, 'Avg size (bytes)'));
+
+    // ── KPIs ─────────────────────────────────────
+    setOverlay('Computing KPIs…');
+    const kpi = await query(`
+      SELECT
+        COUNT(*) AS txns,
+        COUNT(DISTINCT block_number) AS blocks,
+        SUM(input_value)::DOUBLE AS raw_iv
+      FROM btc ${where}
+    `);
+    if (kpi[0]) {
+      document.getElementById('kpi-txns').textContent = Number(kpi[0].txns).toLocaleString();
+      document.getElementById('kpi-blocks').textContent = Number(kpi[0].blocks).toLocaleString();
+      document.getElementById('kpi-btc').textContent = fmtNum((kpi[0].raw_iv||0) * ivScale);
+    }
+
+    // ── Fee distribution ─────────────────────────
+    setOverlay('Computing fee distribution…');
+    const fee_stats = await query(`
+      SELECT
+        quantile_cont(fee, 0.01) AS p1,
+        quantile_cont(fee, 0.99) AS p99
+      FROM btc ${where}
+    `);
+    const { p1: fp1, p99: fp99 } = fee_stats[0] || { p1: 0, p99: 1 };
+
+    const fee_dist = await query(`
+      SELECT
+        LEAST(FLOOR((LEAST(GREATEST(CAST(fee AS DOUBLE), ${fp1}), ${fp99}) - ${fp1})
+          / NULLIF(${fp99} - ${fp1}, 0) * 100) + 1, 100)::INTEGER AS bucket,
+        COUNT(*) AS cnt
+      FROM btc ${andWhere('fee IS NOT NULL')}
+      GROUP BY bucket ORDER BY bucket
+    `);
+
+    const feeSpan = fp99 - fp1;
+    const feeRangeLabels = Array.from({length: 100}, (_, i) => {
+      const lo = (fp1 + i       * feeSpan / 100) * feeScale;
+      const hi = (fp1 + (i + 1) * feeSpan / 100) * feeScale;
+      return `${fmtNum(lo)} – ${fmtNum(hi)}`;
+    });
+    const feeCounts = Array.from({length:100}, (_,i) => {
+      const r = fee_dist.find(d => d.bucket === i+1);
+      return r ? Number(r.cnt) : 0;
+    });
+    charts['c-fee-dist'].setOption(histOpt(feeRangeLabels, feeCounts, BTC));
+
+    // ── Input value distribution ─────────────────
+    setOverlay('Computing input value distribution…');
+    const iv_stats = await query(`
+      SELECT
+        quantile_cont(input_value, 0.01) AS p1,
+        quantile_cont(input_value, 0.99) AS p99
+      FROM btc ${andWhere('input_value > 0')}
+    `);
+    const { p1: ip1, p99: ip99 } = iv_stats[0] || { p1: 0, p99: 1 };
+
+    const iv_dist = await query(`
+      SELECT
+        LEAST(FLOOR((LEAST(GREATEST(CAST(input_value AS DOUBLE), ${ip1}), ${ip99}) - ${ip1})
+          / NULLIF(${ip99} - ${ip1}, 0) * 100) + 1, 100)::INTEGER AS bucket,
+        COUNT(*) AS cnt
+      FROM btc ${andWhere('input_value > 0')}
+      GROUP BY bucket ORDER BY bucket
+    `);
+
+    const ivSpan = ip99 - ip1;
+    const ivRangeLabels = Array.from({length: 100}, (_, i) => {
+      const lo = (ip1 + i       * ivSpan / 100) * ivScale;
+      const hi = (ip1 + (i + 1) * ivSpan / 100) * ivScale;
+      return `${fmtNum(lo)} – ${fmtNum(hi)}`;
+    });
+    const ivCounts = Array.from({length:100}, (_,i) => {
+      const r = iv_dist.find(d => d.bucket === i+1);
+      return r ? Number(r.cnt) : 0;
+    });
+    charts['c-iv-dist'].setOption(histOpt(ivRangeLabels, ivCounts, TEAL));
+
+    hideOverlay();
+    const total = kpi[0] ? Number(kpi[0].txns).toLocaleString() : '?';
+    setStatus(`${total} transactions · ${gran} granularity · coinbase=${state.coinbase} · version=${state.version}`, false);
+
+  } catch (err) {
+    hideOverlay();
+    setStatus(`Query error: ${err.message}`, false, true);
+    console.error(err);
+  }
+}
+
+// ── Toggle builder ───────────────────────────────
+function setupToggles(groupId, key) {
+  document.getElementById(groupId).addEventListener('click', e => {
+    const btn = e.target.closest('.tb');
+    if (!btn) return;
+    document.querySelectorAll(`#${groupId} .tb`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state[key] = btn.dataset.val;
+    renderAll();
+  });
+}
+
+// ── DuckDB init ──────────────────────────────────
+async function initDuckDB() {
+  setOverlay('Loading DuckDB-Wasm…');
+  const duckdb = await import('https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@latest/+esm');
+  const bundles = duckdb.getJsDelivrBundles();
+  const bundle = await duckdb.selectBundle(bundles);
+
+  const workerUrl = URL.createObjectURL(
+    new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
+  );
+  const worker = new Worker(workerUrl);
+  db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
+  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  URL.revokeObjectURL(workerUrl);
+  conn = await db.connect();
+}
+
+
+// ── File fallback ─────────────────────────────────
+function showFallback() {
+  hideOverlay();
+  document.getElementById('file-fallback').style.display = 'flex';
+}
+
+document.getElementById('file-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('file-fallback').style.display = 'none';
+  setOverlay('Registering local Parquet file…');
+  try {
+    await db.registerFileHandle('btc_local.parquet', file, 4 /* BROWSER_FILEREADER */, true);
+    await setupView(null);
+    await detectTimestampType();
+    await renderAll();
+  } catch (err) {
+    hideOverlay();
+    setStatus(`File load error: ${err.message}`, false, true);
+  }
+});
+
+// ── Main ──────────────────────────────────────────
+async function main() {
+  initCharts();
+  setupToggles('gran-group', 'gran');
+  setupToggles('coinbase-group', 'coinbase');
+  setupToggles('version-group', 'version');
+
+  try {
+    await initDuckDB();
+    setOverlay('Connecting to S3…');
+
+    try {
+      await setupView(PARQUET_URL);
+      await detectTimestampType();
+      await renderAll();
+    } catch (err) {
+      const msg = err.message || '';
+      if (msg.includes('fetch') || msg.includes('CORS') || msg.includes('NetworkError') || msg.includes('Failed to fetch') || msg.includes('HTTP')) {
+        console.warn('S3 fetch failed, showing fallback:', err);
+        showFallback();
+        setStatus('CORS blocked — please select a local Parquet file', false, true);
+      } else {
+        throw err;
+      }
+    }
+  } catch (err) {
+    hideOverlay();
+    setStatus(`Init error: ${err.message}`, false, true);
+    console.error(err);
+  }
+}
+
+main();
+</script>
+</body>
+</html>
